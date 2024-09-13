@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Upload</title>
+    <style>
+        div,
+        label {
+            margin: 1rem;
+        }
+    </style>
+</head>
+
+<body style="height: 100vh;margin:0">
+    <form action="" method="post" id="form" enctype="multipart/form-data">
+        <div>
+            <input type="file" name="file" required />
+        </div>
+        <label>
+            Target path:
+            <input type="text" id="target" value="/example" oninput="updateTarget()" required></input>
+        </label>
+        <div>
+            <button type="submit">Upload</button>
+        </div>
+        <div>
+            <button type="button" onclick="deleteTarget()">Delete target path</button>
+        </div>
+    </form>
+</body>
+
+<script>
+    function updateTarget() {
+        document.getElementById('form').action = document.getElementById('target').value
+    }
+    updateTarget()
+
+    async function deleteTarget() {
+        const res = await fetch(document.getElementById('target').value, { method: 'DELETE' })
+        if (res.ok)
+            alert('Target has been deleted')
+        else
+            alert(await res.text())
+    }
+</script>
+
+</html>

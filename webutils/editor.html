@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="vs/editor/editor.main.css">
+    <title>Editor</title>
+</head>
+<script src="vs/loader.js"></script>
+<script src="vs/editor/editor.main.js"></script>
+
+
+<body style="height: 100vh;margin:0">
+    <div style="position: fixed;bottom:0;left:0;z-index:100">
+        <button type="button" onclick="save()">Save</button>
+        <button type="button" onclick="view()">View</button>
+        <button type="button" onclick="setLanguage('html')">HTML</button>
+        <button type="button" onclick="setLanguage('css')">CSS</button>
+        <button type="button" onclick="setLanguage('javascript')">JS</button>
+    </div>
+    <div id="container" style="height: 100%"></div>
+</body>
+
+<script>
+
+    async function save() {
+        const form = new FormData()
+        form.set('file', new Blob([myEditor.getValue()]))
+        const res = await fetch(path, { method: 'POST', body: form })
+        if (res.ok)
+            alert('Saved')
+        else
+            alert(await res.text())
+    }
+
+    async function view() {
+        window.open(path, '_blank')
+    }
+
+    async function setLanguage(lang) {
+        const model = myEditor.getModel()
+        monaco.editor.setModelLanguage(model, lang)
+    }
+
+    var myEditor
+
+    var path = new URLSearchParams(window.location.search).get('path')
+    if (!path) {
+        alert('Please provide URL parameter: ?path=/file/to/edit.html')
+    } else {
+        fetch(path).then(async res => {
+            const value = res.ok ? await res.text() : ''
+
+            let language = undefined
+            if (path.endsWith('.html')) language = 'html'
+            else if (path.endsWith('.css')) language = 'css'
+            else if (path.endsWith('.js')) language = 'javascript'
+
+            myEditor = monaco.editor.create(document.getElementById("container"), {
+                value,
+                language,
+                automaticLayout: true,
+            })
+        })
+
+    }
+
+</script>
+
+</html>
