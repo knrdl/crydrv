@@ -17,6 +17,10 @@ tar zxvf monaco-editor-0.51.0.tgz
 cd package/min/vs/
 
 find . -name '*' -type f -exec curl -u USERNAME:PASSWORD -F "file=@{}" http://localhost:8000/vs/{} \;
+
+cd ../../..
+rm monaco-editor-0.51.0.tgz
+rm -rf package
 ```
 
 Visit http://localhost:8000/editor
