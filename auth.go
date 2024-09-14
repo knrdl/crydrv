@@ -31,7 +31,7 @@ func (app *AppData) handleAuth(w http.ResponseWriter, r *http.Request) *AuthData
 			userKey, err := strDecode(cookie.Value)
 			if err != nil {
 				http.SetCookie(w, deleteCookie)
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				http.Error(w, sanitizeError(err), http.StatusBadRequest)
 				return nil
 			}
 			if len(userKey) != USER_KEY_LENGTH {
@@ -49,7 +49,7 @@ func (app *AppData) handleAuth(w http.ResponseWriter, r *http.Request) *AuthData
 				return auth
 			} else if err != nil {
 				http.SetCookie(w, deleteCookie)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, sanitizeError(err), http.StatusInternalServerError)
 				return nil
 			} else {
 				http.SetCookie(w, deleteCookie)
@@ -66,13 +66,13 @@ func (app *AppData) handleAuth(w http.ResponseWriter, r *http.Request) *AuthData
 
 			if app.openRegistration {
 				if err := os.MkdirAll(string(auth.userDirPath), 0700); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					http.Error(w, sanitizeError(err), http.StatusInternalServerError)
 					return nil
 				}
 			} else {
 				ok, err := IsDir(string(auth.userDirPath))
 				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					http.Error(w, sanitizeError(err), http.StatusInternalServerError)
 					return nil
 				} else if !ok {
 					http.Error(w, "unknown account", http.StatusBadRequest)

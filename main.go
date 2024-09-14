@@ -35,11 +35,11 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 				defer file.Close()
 				http.ServeContent(w, r, cryPath, file.modTime, file) // cryPath for mime type detection by extension
 			} else {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				http.Error(w, sanitizeError(err), http.StatusBadRequest)
 				return
 			}
 		} else if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, sanitizeError(err), http.StatusInternalServerError)
 			return
 
 		} else {
@@ -49,11 +49,14 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	case "POST", "PUT":
 
-		r.ParseMultipartForm(32 << 20) // read first 32MB into memory and spool to disk on overflow
+		if err := r.ParseMultipartForm(32 << 20); err != nil { // read first 32MiB into memory and spool to disk on overflow
+			http.Error(w, sanitizeError(err), http.StatusBadRequest)
+			return
+		}
 
 		file, handler, err := r.FormFile("file")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, sanitizeError(err), http.StatusBadRequest)
 			return
 		}
 		defer file.Close()
@@ -75,11 +78,11 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			} else {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, sanitizeError(err), http.StatusInternalServerError)
 				return
 			}
 		} else if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, sanitizeError(err), http.StatusInternalServerError)
 			return
 		} else {
 			http.Error(w, "not found", http.StatusNotFound)
