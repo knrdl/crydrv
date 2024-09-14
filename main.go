@@ -6,7 +6,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 )
 
 type AppData struct {
@@ -52,8 +51,6 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 		r.ParseMultipartForm(32 << 20) // read first 32MB into memory and spool to disk on overflow
 
-		start := time.Now()
-
 		file, handler, err := r.FormFile("file")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -70,8 +67,6 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 		}
 
-		elapsed := time.Since(start)
-		log.Printf("Upload took %s", elapsed.Round(time.Millisecond))
 		return
 
 	case "DELETE":
