@@ -17,6 +17,8 @@ WORKDIR /
 
 VOLUME [ "/www" ]
 
-COPY --from=builder /crydrv /crydrv
+USER 1000:1000
+
+COPY --from=builder --chmod=0500 --chown=1000:1000 /crydrv /crydrv
 
 CMD ["/crydrv"]
