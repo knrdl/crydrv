@@ -56,7 +56,7 @@ services:
     ports:
       - 8000:8000
     volumes:
-      - ./data:/www
+      - ./data:/www  # chown -R 1000:1000 ./data
 
     mem_limit: 4g
     memswap_limit: 4g
