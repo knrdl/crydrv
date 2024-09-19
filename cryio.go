@@ -12,6 +12,27 @@ import (
 const BLOCK_SIZE_UNENCRYPTED int = 4 * 1024 * 1024                // 4 MiB
 const BLOCK_SIZE_ENCRYPTED int = BLOCK_SIZE_UNENCRYPTED + 12 + 16 // 4 MiB + AES nonce + PKCS#7 padding
 
+var accessLocks sync.Map = sync.Map{}
+
+func (filepath FsFilepath) ReadLock() {
+	mutex, _ := accessLocks.LoadOrStore(filepath, new(sync.RWMutex))
+	mutex.(*sync.RWMutex).RLock()
+}
+func (filepath FsFilepath) ReadUnlock() {
+	if mutex, ok := accessLocks.Load(filepath); ok {
+		mutex.(*sync.RWMutex).RUnlock()
+	}
+}
+func (filepath FsFilepath) WriteLock() {
+	mutex, _ := accessLocks.LoadOrStore(filepath, new(sync.RWMutex))
+	mutex.(*sync.RWMutex).Lock()
+}
+func (filepath FsFilepath) WriteUnlock() {
+	if mutex, ok := accessLocks.Load(filepath); ok {
+		mutex.(*sync.RWMutex).Unlock()
+	}
+}
+
 type BlockCache struct {
 	sync.Mutex
 
@@ -39,6 +60,8 @@ func NewCryFileReader(filepath FsFilepath, userKey UserKey) (*CryFileReader, err
 	f.userKey = userKey
 	f.filepath = filepath
 	f.position = 0
+
+	f.filepath.ReadLock()
 
 	stat, err := os.Stat(string(f.filepath))
 	if err != nil {
@@ -128,6 +151,7 @@ func (f *CryFileReader) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (f *CryFileReader) Close() error {
+	defer f.filepath.ReadUnlock()
 	return f.file.Close()
 }
 
@@ -137,6 +161,9 @@ func WriteCryFile(outFilepath FsFilepath, inFile io.Reader, inFileSize int64, us
 	if err := os.MkdirAll(outDir, 0700); err != nil {
 		return err
 	}
+
+	outFilepath.WriteLock()
+	defer outFilepath.WriteUnlock()
 
 	outFile, err := os.Create(string(outFilepath))
 	if err != nil {

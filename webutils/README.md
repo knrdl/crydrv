@@ -23,7 +23,7 @@ rm monaco-editor-0.51.0.tgz
 rm -rf package
 ```
 
-Visit http://localhost:8000/editor
+Visit http://localhost:8000/editor?path=/index.html
 
 # Logout javascript snippet
 
