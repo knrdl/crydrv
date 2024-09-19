@@ -133,7 +133,7 @@ func main() {
 
 	app.minPasswordLength = 16
 	if minPasswordLengthStr := os.Getenv("MIN_PASSWORD_LENGTH"); minPasswordLengthStr != "" {
-		minPasswordLength, err := strconv.Atoi(minPasswordLengthStr)
+		minPasswordLength, err := strconv.ParseUint(minPasswordLengthStr, 10, 32)
 		if err == nil && minPasswordLength > 0 && minPasswordLength <= math.MaxUint32 {
 			app.minPasswordLength = uint32(minPasswordLength)
 		} else {
