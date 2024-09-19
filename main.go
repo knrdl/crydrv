@@ -42,6 +42,8 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET", "HEAD":
+		fsPath.ReadLock()
+		defer fsPath.ReadUnlock()
 		if file, err := NewCryFileReader(fsPath, auth.userKey); err == nil {
 			defer file.Close()
 			http.ServeContent(w, r, urlPath, file.modTime, file) // urlPath for mime type detection by extension
