@@ -134,7 +134,7 @@ func (f *CryFileReader) Close() error {
 func WriteCryFile(outFilepath FsFilepath, inFile io.Reader, inFileSize int64, userKey UserKey) error {
 
 	outDir := path.Dir(string(outFilepath))
-	if err := os.Mkdir(outDir, 0700); err != nil {
+	if err := os.MkdirAll(outDir, 0700); err != nil {
 		return err
 	}
 

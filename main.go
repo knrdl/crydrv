@@ -41,7 +41,7 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 	fsPath := cryName.toFilepath(app.webBaseDir)
 
 	switch r.Method {
-	case "GET":
+	case "GET", "HEAD":
 		if file, err := NewCryFileReader(fsPath, auth.userKey); err == nil {
 			defer file.Close()
 			http.ServeContent(w, r, urlPath, file.modTime, file) // urlPath for mime type detection by extension
@@ -66,7 +66,10 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		defer file.Close()
 
-		WriteCryFile(fsPath, file, handler.Size, auth.userKey)
+		if err := WriteCryFile(fsPath, file, handler.Size, auth.userKey); err != nil {
+			http.Error(w, sanitizeError(err), http.StatusInternalServerError)
+			return
+		}
 
 		if r.Method == "POST" {
 			w.Header().Set("Location", r.URL.Path)
