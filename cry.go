@@ -14,7 +14,8 @@ import (
 
 var hkdfHasher = sha512.New512_256
 
-const USER_KEY_LENGTH = 32 // bytes
+const USER_KEY_LENGTH = 32         // bytes
+const USER_FINGERPRINT_LENGTH = 32 // bytes
 
 func strEncode(value []byte) string {
 	return base64.RawURLEncoding.EncodeToString(value)
@@ -43,18 +44,18 @@ func makeUserSalt(appKey AppKey, username Username) UserSalt {
 	return hash
 }
 
-func (userKey UserKey) hash(userSalt UserSalt) UserKeyHash {
+func (userKey UserKey) hash(userSalt UserSalt) UserFingerprint {
 	hkdf := hkdf.New(hkdfHasher, userKey, userSalt, nil)
-	hash := make(UserKeyHash, hkdfHasher().Size())
+	hash := make(UserFingerprint, hkdfHasher().Size())
 	Try(io.ReadFull(hkdf, hash))
 	return hash
 }
 
-func (crypath CryPath) hash(userKey UserKey, userSalt UserSalt) FsFilename {
+func (crypath CryPath) hash(userKey UserKey, userSalt UserSalt) CryFilename {
 	hkdf := hkdf.New(hkdfHasher, userKey, append(userSalt[:], []byte(crypath)[:]...), nil)
 	hash := make([]byte, hkdfHasher().Size())
 	Try(io.ReadFull(hkdf, hash))
-	return FsFilename(strEncode(hash))
+	return CryFilename(strEncode(hash))
 }
 
 func (password Password) hash(userSalt UserSalt) UserKey {

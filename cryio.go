@@ -4,6 +4,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path"
 	"sync"
 	"time"
 )
@@ -21,7 +22,7 @@ type BlockCache struct {
 type CryFileReader struct {
 	io.ReadSeeker
 
-	filepath FsPath
+	filepath FsFilepath
 	datasize int64
 	blocks   int64
 	position int64
@@ -33,7 +34,7 @@ type CryFileReader struct {
 	file *os.File
 }
 
-func NewCryFileReader(filepath FsPath, userKey UserKey) (*CryFileReader, error) {
+func NewCryFileReader(filepath FsFilepath, userKey UserKey) (*CryFileReader, error) {
 	f := new(CryFileReader)
 	f.userKey = userKey
 	f.filepath = filepath
@@ -130,7 +131,12 @@ func (f *CryFileReader) Close() error {
 	return f.file.Close()
 }
 
-func WriteCryFile(outFilepath FsPath, inFile io.Reader, inFileSize int64, userKey UserKey) error {
+func WriteCryFile(outFilepath FsFilepath, inFile io.Reader, inFileSize int64, userKey UserKey) error {
+
+	outDir := path.Dir(string(outFilepath))
+	if err := os.Mkdir(outDir, 0700); err != nil {
+		return err
+	}
 
 	outFile, err := os.Create(string(outFilepath))
 	if err != nil {
@@ -156,5 +162,14 @@ func WriteCryFile(outFilepath FsPath, inFile io.Reader, inFileSize int64, userKe
 		}
 	}
 
+	if err := outFile.Close(); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (cryFilename *CryFilename) toFilepath(basedir string) FsFilepath {
+	str := string(*cryFilename)
+	return FsFilepath(path.Join(basedir, str[0:2], str[2:]))
 }

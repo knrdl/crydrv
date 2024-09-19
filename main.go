@@ -1,54 +1,58 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type AppData struct {
-	appKey           AppKey
-	openRegistration bool
-	webBaseDir       string
+	appKey            AppKey
+	openRegistration  bool
+	usersAllowlist    UserFingerprints
+	webBaseDir        string
+	minPasswordLength uint32
+	cookieLifetime    time.Duration
 }
 
 func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
+	urlPath := path.Clean(r.URL.Path)
+	if len(urlPath) == 0 {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/") {
+		urlPath = path.Join(urlPath, "index.html")
+	}
+
 	auth := app.handleAuth(w, r)
 	if auth == nil {
+		// handleAuth has already set the http response
 		return
 	}
 
-	cryPath := path.Clean(r.URL.Path)
-	if strings.HasSuffix(r.URL.Path, "/") {
-		cryPath = path.Join(cryPath, "index.html")
-	}
-
-	filename := CryPath(cryPath).hash(auth.userKey, auth.userSalt)
-	filepath := path.Join(string(auth.userDirPath), string(filename))
+	cryName := CryPath(urlPath).hash(auth.userKey, auth.userSalt)
+	fsPath := cryName.toFilepath(app.webBaseDir)
 
 	switch r.Method {
 	case "GET":
-		if ok, err := IsFile(filepath); ok {
-			if file, err := NewCryFileReader(FsPath(filepath), auth.userKey); err == nil {
-				defer file.Close()
-				http.ServeContent(w, r, cryPath, file.modTime, file) // cryPath for mime type detection by extension
-			} else {
-				http.Error(w, sanitizeError(err), http.StatusBadRequest)
-				return
-			}
-		} else if err != nil {
-			http.Error(w, sanitizeError(err), http.StatusInternalServerError)
-			return
-
-		} else {
+		if file, err := NewCryFileReader(fsPath, auth.userKey); err == nil {
+			defer file.Close()
+			http.ServeContent(w, r, urlPath, file.modTime, file) // urlPath for mime type detection by extension
+		} else if errors.Is(err, os.ErrNotExist) {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
-
+		} else {
+			http.Error(w, sanitizeError(err), http.StatusBadRequest)
+			return
 		}
-	case "POST", "PUT":
 
+	case "POST", "PUT":
 		if err := r.ParseMultipartForm(32 << 20); err != nil { // read first 32MiB into memory and spool to disk on overflow
 			http.Error(w, sanitizeError(err), http.StatusBadRequest)
 			return
@@ -61,11 +65,11 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		defer file.Close()
 
-		WriteCryFile(FsPath(filepath), file, handler.Size, auth.userKey)
+		WriteCryFile(fsPath, file, handler.Size, auth.userKey)
 
 		if r.Method == "POST" {
-			w.WriteHeader(http.StatusCreated)
 			w.Header().Set("Location", r.URL.Path)
+			w.WriteHeader(http.StatusCreated)
 		} else {
 			w.WriteHeader(http.StatusNoContent)
 		}
@@ -73,8 +77,8 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case "DELETE":
-		if ok, err := IsFile(filepath); ok {
-			if err = os.Remove(filepath); err == nil {
+		if ok, err := IsFile(string(fsPath)); err == nil && ok {
+			if err = os.Remove(string(fsPath)); err == nil {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			} else {
@@ -94,24 +98,54 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func addSecurityHeaders(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Referrer-Policy", "strict-origin")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "sameorigin")
+		next(w, r)
+	}
+}
+
 func main() {
+	app := new(AppData)
 
 	if os.Getenv("SECRET_KEY") == "" {
 		log.Fatalf("Missing env var SECRET_KEY ... here is a good one: SECRET_KEY=%s", strEncode(Try(makeAppKey())))
 	}
-
-	app := new(AppData)
 	app.appKey = Try(strDecode(os.Getenv("SECRET_KEY")))
-	app.openRegistration = os.Getenv("OPEN_REGISTRATION") == "true"
-	app.webBaseDir = "./www"
-	Check(os.MkdirAll(app.webBaseDir, 0700))
 
+	app.openRegistration = os.Getenv("OPEN_REGISTRATION") == "true"
 	if app.openRegistration {
 		log.Println("OPEN_REGISTRATION is enabled (every username/password combination can login)")
 	} else {
-		log.Println("OPEN_REGISTRATION is disabled (only existing users can login). Set env var OPEN_REGISTRATION=true to enable")
+		log.Println("OPEN_REGISTRATION is disabled (only users on allowlist can login). Set env var OPEN_REGISTRATION=true to enable")
+		if err := app.usersAllowlist.Load(os.Getenv("USERS_ALLOWLIST")); err != nil {
+			log.Fatal("USERS_ALLOWLIST contains invalid values:", err.Error())
+		}
+		if len(app.usersAllowlist) == 0 {
+			log.Println("USERS_ALLOWLIST contains no values. Nobody can login")
+		} else {
+			log.Println("USERS_ALLOWLIST contains", len(app.usersAllowlist), "records")
+		}
 	}
 
-	http.HandleFunc("/", app.handleRequest)
+	app.minPasswordLength = 16
+	if minPasswordLengthStr := os.Getenv("MIN_PASSWORD_LENGTH"); minPasswordLengthStr != "" {
+		minPasswordLength, err := strconv.Atoi(minPasswordLengthStr)
+		if err == nil && minPasswordLength > 0 {
+			app.minPasswordLength = uint32(minPasswordLength)
+		} else {
+			log.Fatalf("invalid value for MIN_PASSWORD_LENGTH provided")
+		}
+	}
+	log.Println("MIN_PASSWORD_LENGTH is set to", app.minPasswordLength)
+
+	app.cookieLifetime = 24 * time.Hour
+
+	app.webBaseDir = "./www"
+	Check(os.MkdirAll(app.webBaseDir, 0700))
+
+	http.HandleFunc("/", addSecurityHeaders(app.handleRequest))
 	log.Fatal(http.ListenAndServe(":8000", nil))
 }
