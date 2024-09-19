@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"path"
@@ -133,7 +134,7 @@ func main() {
 	app.minPasswordLength = 16
 	if minPasswordLengthStr := os.Getenv("MIN_PASSWORD_LENGTH"); minPasswordLengthStr != "" {
 		minPasswordLength, err := strconv.Atoi(minPasswordLengthStr)
-		if err == nil && minPasswordLength > 0 {
+		if err == nil && minPasswordLength > 0 && minPasswordLength <= math.MaxUint32 {
 			app.minPasswordLength = uint32(minPasswordLength)
 		} else {
 			log.Fatalf("invalid value for MIN_PASSWORD_LENGTH provided")
