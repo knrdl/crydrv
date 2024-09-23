@@ -113,13 +113,14 @@ func addSecurityHeaders(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func main() {
-	app := new(AppData)
-
+func makeAppData() (app AppData) {
 	if os.Getenv("SECRET_KEY") == "" {
 		log.Fatalf("Missing env var SECRET_KEY ... here is a good one: SECRET_KEY=%s", strEncode(Try(makeAppKey())))
 	}
 	app.appKey = Try(strDecode(os.Getenv("SECRET_KEY")))
+	if len(app.appKey) != APP_KEY_LENGTH {
+		log.Fatal("Wrong length for env var SECRET_KEY")
+	}
 
 	app.openRegistration = os.Getenv("OPEN_REGISTRATION") == "true"
 	if app.openRegistration {
@@ -151,6 +152,12 @@ func main() {
 
 	app.webBaseDir = "./www"
 	Check(os.MkdirAll(app.webBaseDir, 0700))
+
+	return app
+}
+
+func main() {
+	app := makeAppData()
 
 	http.HandleFunc("/", addSecurityHeaders(app.handleRequest))
 	log.Fatal(http.ListenAndServe(":8000", nil))

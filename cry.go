@@ -14,7 +14,9 @@ import (
 
 var hkdfHasher = sha512.New512_256
 
+const APP_KEY_LENGTH = 32          // bytes
 const USER_KEY_LENGTH = 32         // bytes
+const USER_SALT_LENGTH = 32        // bytes
 const USER_FINGERPRINT_LENGTH = 32 // bytes
 
 func strEncode(value []byte) string {
