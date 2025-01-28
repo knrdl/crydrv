@@ -99,7 +99,10 @@ func TestCRUD(t *testing.T) {
 				t0.Error(err)
 			}
 
-			part.Write([]byte(fileContent1))
+			_, err = part.Write([]byte(fileContent1))
+			if err != nil {
+				t0.Error(err)
+			}
 		}()
 
 		r := httptest.NewRequest(http.MethodPost, "/", pr)
@@ -147,7 +150,10 @@ func TestCRUD(t *testing.T) {
 				t0.Error(err)
 			}
 
-			part.Write([]byte(fileContent2))
+			_, err = part.Write([]byte(fileContent2))
+			if err != nil {
+				t0.Error(err)
+			}
 		}()
 
 		r := httptest.NewRequest(http.MethodPut, "/", pr)

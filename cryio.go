@@ -76,7 +76,11 @@ func NewCryFileReader(filepath FsFilepath, userKey UserKey) (*CryFileReader, err
 
 	lastBlockIndex := int64(f.blocks - 1)
 	buf := make(Ciphertext, BLOCK_SIZE_ENCRYPTED)
-	f.file.Seek((lastBlockIndex * int64(BLOCK_SIZE_ENCRYPTED)), io.SeekStart)
+	_, err = f.file.Seek((lastBlockIndex * int64(BLOCK_SIZE_ENCRYPTED)), io.SeekStart)
+	if err != nil {
+		defer f.file.Close()
+		return nil, err
+	}
 	n, err := f.file.Read(buf)
 	if err != nil {
 		defer f.file.Close()
@@ -107,7 +111,12 @@ func (f *CryFileReader) Read(p []byte) (int, error) {
 	f.blockCache.Unlock()
 	if cacheIndex != blockIndex {
 
-		f.file.Seek(blockIndex*int64(BLOCK_SIZE_ENCRYPTED), io.SeekStart)
+		_, err := f.file.Seek(blockIndex*int64(BLOCK_SIZE_ENCRYPTED), io.SeekStart)
+		if err != nil {
+			defer f.file.Close()
+			return 0, err
+		}
+
 		buf := make(Ciphertext, BLOCK_SIZE_ENCRYPTED)
 		n, err := f.file.Read(buf)
 		if err != nil {
@@ -181,7 +190,11 @@ func WriteCryFile(outFilepath FsFilepath, inFile io.Reader, inFileSize int64, us
 			if err != nil {
 				return err
 			}
-			outFile.Write(encrypted)
+
+			_, err = outFile.Write(encrypted)
+			if err != nil {
+				return err
+			}
 		} else {
 			break
 		}

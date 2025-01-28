@@ -53,3 +53,25 @@ func TestEncryptDecrypt(t *testing.T) {
 		t.Errorf("encrypt/decrypt failed")
 	}
 }
+
+func BenchmarkEncrypt(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		appKey := []byte(Try(makeAppKey()))
+		userKey := UserKey(appKey)
+		plaintext := Plaintext(appKey)
+		b.StartTimer()
+		_ = Try(userKey.encrypt(plaintext))
+	}
+}
+func BenchmarkDecrypt(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		appKey := []byte(Try(makeAppKey()))
+		userKey := UserKey(appKey)
+		plaintext := Plaintext(appKey)
+		ciphertext := Ciphertext(Try(userKey.encrypt(plaintext)))
+		b.StartTimer()
+		_ = Try(userKey.decrypt(ciphertext))
+	}
+}
