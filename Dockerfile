@@ -1,4 +1,4 @@
-FROM docker.io/golang:1.23.5-alpine3.21 AS builder
+FROM docker.io/golang:1.23.6-alpine3.21 AS builder
 
 # add /etc/mime.types
 RUN apk add mailcap  
