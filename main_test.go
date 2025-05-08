@@ -67,7 +67,7 @@ func TestCRUD(t *testing.T) {
 	app := makeAppData()
 
 	app.webBaseDir = "./www-test"
-	defer os.RemoveAll(app.webBaseDir)
+	defer CheckFunc(func() error { return os.RemoveAll(app.webBaseDir) })
 	Check(os.MkdirAll(app.webBaseDir, 0700))
 
 	const fileContent1 = "test1"
@@ -91,7 +91,7 @@ func TestCRUD(t *testing.T) {
 		writer := multipart.NewWriter(pw)
 
 		go func() {
-			defer writer.Close()
+			defer CheckFunc(writer.Close)
 			//we create the form data field 'fileupload'
 			//wich returns another writer to write the actual file
 			part, err := writer.CreateFormFile("file", "index.html")
@@ -112,7 +112,7 @@ func TestCRUD(t *testing.T) {
 		app.handleRequest(w, r)
 		if w.Code != http.StatusCreated {
 			res := w.Result()
-			defer res.Body.Close()
+			defer CheckFunc(res.Body.Close)
 			data := Try(io.ReadAll(res.Body))
 			t0.Errorf("expected 201, got %+v %s", res, data)
 		}
@@ -127,7 +127,7 @@ func TestCRUD(t *testing.T) {
 			t0.Errorf("expected 200, got %v", w.Code)
 		}
 		res := w.Result()
-		defer res.Body.Close()
+		defer CheckFunc(res.Body.Close)
 		data := Try(io.ReadAll(res.Body))
 		if string(data) != fileContent1 {
 			t0.Errorf("received wrong content: %v", data)
@@ -142,7 +142,7 @@ func TestCRUD(t *testing.T) {
 		writer := multipart.NewWriter(pw)
 
 		go func() {
-			defer writer.Close()
+			defer CheckFunc(writer.Close)
 			//we create the form data field 'fileupload'
 			//wich returns another writer to write the actual file
 			part, err := writer.CreateFormFile("file", "index.html")
@@ -163,7 +163,7 @@ func TestCRUD(t *testing.T) {
 		app.handleRequest(w, r)
 		if w.Code != http.StatusNoContent {
 			res := w.Result()
-			defer res.Body.Close()
+			defer CheckFunc(res.Body.Close)
 			data := Try(io.ReadAll(res.Body))
 			t0.Errorf("expected 204, got %+v %s", res, data)
 		}

@@ -45,7 +45,7 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 		fsPath.ReadLock()
 		defer fsPath.ReadUnlock()
 		if file, err := NewCryFileReader(fsPath, auth.userKey); err == nil {
-			defer file.Close()
+			defer CheckFunc(file.Close)
 			http.ServeContent(w, r, urlPath, file.modTime, file) // urlPath for mime type detection by extension
 		} else if errors.Is(err, os.ErrNotExist) {
 			http.Error(w, "not found", http.StatusNotFound)
@@ -66,7 +66,7 @@ func (app *AppData) handleRequest(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, sanitizeError(err), http.StatusBadRequest)
 			return
 		}
-		defer file.Close()
+		defer CheckFunc(file.Close)
 
 		if err := WriteCryFile(fsPath, file, handler.Size, auth.userKey); err != nil {
 			http.Error(w, sanitizeError(err), http.StatusInternalServerError)

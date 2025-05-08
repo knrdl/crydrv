@@ -13,6 +13,14 @@ func Check(err error) {
 	}
 }
 
+func CheckFunc(f func() error) {
+	Check(f())
+}
+
+func IgnoreErrFunc(f func() error) {
+	_ = f()
+}
+
 func Try[T any](result T, err error) T {
 	Check(err)
 	return result
