@@ -1,16 +1,16 @@
 package main
 
 import (
+	"errors"
 	"io"
-	"math"
 	"os"
-	"path"
+	"path/filepath"
 	"sync"
 	"time"
 )
 
-const BLOCK_SIZE_UNENCRYPTED int = 4 * 1024 * 1024                // 4 MiB
-const BLOCK_SIZE_ENCRYPTED int = BLOCK_SIZE_UNENCRYPTED + 12 + 16 // 4 MiB + AES nonce + PKCS#7 padding
+const BLOCK_SIZE_UNENCRYPTED = 4 * 1024 * 1024                // 4 MiB
+const BLOCK_SIZE_ENCRYPTED = BLOCK_SIZE_UNENCRYPTED + 12 + 16 // 4 MiB + AES nonce + PKCS#7 padding
 
 var accessLocks sync.Map = sync.Map{}
 
@@ -66,7 +66,7 @@ func NewCryFileReader(filepath FsFilepath, userKey UserKey) (*CryFileReader, err
 		return nil, err
 	}
 
-	f.blocks = int64(math.Ceil(float64(stat.Size()) / float64(BLOCK_SIZE_ENCRYPTED)))
+	f.blocks = (stat.Size() + BLOCK_SIZE_ENCRYPTED - 1) / BLOCK_SIZE_ENCRYPTED
 	f.modTime = stat.ModTime()
 
 	f.file, err = os.Open(string(f.filepath))
@@ -142,21 +142,26 @@ func (f *CryFileReader) Read(p []byte) (int, error) {
 	remainingBlockSize := int64(len(decrypted)) - blockOffset
 	readableByteSize := Min(int64(len(p)), remainingBlockSize)
 
-	f.position += readableByteSize
+	if readableByteSize > 0 {
+		f.position += readableByteSize
 
-	copy(p, decrypted[blockOffset:blockOffset+readableByteSize])
-	return int(readableByteSize), nil
+		copy(p, decrypted[blockOffset:blockOffset+readableByteSize])
+		return int(readableByteSize), nil
+	} else {
+		return 0, io.EOF
+	}
 }
 
 func (f *CryFileReader) Seek(offset int64, whence int) (int64, error) {
-	if whence == io.SeekStart {
+	switch whence {
+	case io.SeekStart:
 		f.position = offset
-	}
-	if whence == io.SeekCurrent {
+	case io.SeekCurrent:
 		f.position += offset
-	}
-	if whence == io.SeekEnd {
+	case io.SeekEnd:
 		f.position = f.datasize + offset
+	default:
+		return 0, errors.New("invalid whence")
 	}
 	f.position = Clamp(0, f.position, f.datasize)
 	return f.position, nil
@@ -168,7 +173,7 @@ func (f *CryFileReader) Close() error {
 
 func WriteCryFile(outFilepath FsFilepath, inFile io.Reader, inFileSize int64, userKey UserKey) error {
 
-	outDir := path.Dir(string(outFilepath))
+	outDir := filepath.Dir(string(outFilepath))
 	if err := os.MkdirAll(outDir, 0700); err != nil {
 		return err
 	}
@@ -185,22 +190,22 @@ func WriteCryFile(outFilepath FsFilepath, inFile io.Reader, inFileSize int64, us
 	buf := make(Plaintext, Min(int64(BLOCK_SIZE_UNENCRYPTED), inFileSize))
 	for {
 		n, err := inFile.Read(buf)
-		if err != io.EOF {
-			if err != nil {
-				return err
-			}
 
+		if n > 0 {
 			encrypted, err := userKey.encrypt(buf[:n])
 			if err != nil {
 				return err
 			}
 
-			_, err = outFile.Write(encrypted)
-			if err != nil {
+			if _, err := outFile.Write(encrypted); err != nil {
 				return err
 			}
-		} else {
+		}
+
+		if err == io.EOF {
 			break
+		} else if err != nil {
+			return err
 		}
 	}
 
@@ -213,5 +218,5 @@ func WriteCryFile(outFilepath FsFilepath, inFile io.Reader, inFileSize int64, us
 
 func (cryFilename *CryFilename) toFilepath(basedir string) FsFilepath {
 	str := string(*cryFilename)
-	return FsFilepath(path.Join(basedir, str[0:2], str[2:]))
+	return FsFilepath(filepath.Join(basedir, str[0:2], str[2:]))
 }
