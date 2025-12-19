@@ -74,26 +74,30 @@ func NewCryFileReader(filepath FsFilepath, userKey UserKey) (*CryFileReader, err
 		return nil, err
 	}
 
-	lastBlockIndex := int64(f.blocks - 1)
-	buf := make(Ciphertext, BLOCK_SIZE_ENCRYPTED)
-	_, err = f.file.Seek((lastBlockIndex * int64(BLOCK_SIZE_ENCRYPTED)), io.SeekStart)
-	if err != nil {
-		defer IgnoreErrFunc(f.file.Close)
-		return nil, err
+	if f.blocks > 0 {
+		lastBlockIndex := int64(f.blocks - 1)
+		buf := make(Ciphertext, BLOCK_SIZE_ENCRYPTED)
+		_, err = f.file.Seek((lastBlockIndex * int64(BLOCK_SIZE_ENCRYPTED)), io.SeekStart)
+		if err != nil {
+			defer IgnoreErrFunc(f.file.Close)
+			return nil, err
+		}
+		n, err := f.file.Read(buf)
+		if err != nil {
+			defer IgnoreErrFunc(f.file.Close)
+			return nil, err
+		}
+		decrypted, err := f.userKey.decrypt(buf[:n])
+		if err != nil {
+			defer IgnoreErrFunc(f.file.Close)
+			return nil, err
+		}
+		f.blockCache = &BlockCache{index: lastBlockIndex, data: decrypted}
+		f.datasize = (lastBlockIndex * int64(BLOCK_SIZE_UNENCRYPTED)) + int64(len(decrypted))
+	} else { // empty file
+		f.blockCache = &BlockCache{index: 0, data: []byte{}}
+		f.datasize = 0
 	}
-	n, err := f.file.Read(buf)
-	if err != nil {
-		defer IgnoreErrFunc(f.file.Close)
-		return nil, err
-	}
-	decrypted, err := f.userKey.decrypt(buf[:n])
-	if err != nil {
-		defer IgnoreErrFunc(f.file.Close)
-		return nil, err
-	}
-	f.blockCache = &BlockCache{index: lastBlockIndex, data: decrypted}
-	f.datasize = (lastBlockIndex * int64(BLOCK_SIZE_UNENCRYPTED)) + int64(len(decrypted))
-
 	return f, nil
 }
 
