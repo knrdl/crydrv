@@ -14,7 +14,8 @@ const BLOCK_SIZE_ENCRYPTED = BLOCK_SIZE_UNENCRYPTED + 12 + 16 // 4 MiB + AES non
 
 var cipherReadBufferPool = sync.Pool{
 	New: func() any {
-		return make(Ciphertext, BLOCK_SIZE_ENCRYPTED)
+		b := make(Ciphertext, BLOCK_SIZE_ENCRYPTED)
+		return &b
 	},
 }
 
@@ -106,13 +107,13 @@ func (f *CryFileReader) Read(p []byte) (int, error) {
 			return 0, err
 		}
 
-		buf := cipherReadBufferPool.Get().(Ciphertext)
+		buf := cipherReadBufferPool.Get().(*Ciphertext)
 		defer cipherReadBufferPool.Put(buf)
-		n, err := f.file.Read(buf)
+		n, err := f.file.Read(*buf)
 		if err != nil {
 			return 0, err
 		}
-		decrypted, err := f.userKey.decrypt(buf[:n])
+		decrypted, err := f.userKey.decrypt((*buf)[:n])
 		if err != nil {
 			return 0, err
 		}
