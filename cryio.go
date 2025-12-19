@@ -12,27 +12,6 @@ import (
 const BLOCK_SIZE_UNENCRYPTED = 4 * 1024 * 1024                // 4 MiB
 const BLOCK_SIZE_ENCRYPTED = BLOCK_SIZE_UNENCRYPTED + 12 + 16 // 4 MiB + AES nonce + PKCS#7 padding
 
-var accessLocks sync.Map = sync.Map{}
-
-func (filepath FsFilepath) ReadLock() {
-	mutex, _ := accessLocks.LoadOrStore(filepath, new(sync.RWMutex))
-	mutex.(*sync.RWMutex).RLock()
-}
-func (filepath FsFilepath) ReadUnlock() {
-	if mutex, ok := accessLocks.Load(filepath); ok {
-		mutex.(*sync.RWMutex).RUnlock()
-	}
-}
-func (filepath FsFilepath) WriteLock() {
-	mutex, _ := accessLocks.LoadOrStore(filepath, new(sync.RWMutex))
-	mutex.(*sync.RWMutex).Lock()
-}
-func (filepath FsFilepath) WriteUnlock() {
-	if mutex, ok := accessLocks.Load(filepath); ok {
-		mutex.(*sync.RWMutex).Unlock()
-	}
-}
-
 var cipherReadBufferPool = sync.Pool{
 	New: func() any {
 		return make(Ciphertext, BLOCK_SIZE_ENCRYPTED)
@@ -185,8 +164,8 @@ func WriteCryFile(outFilepath FsFilepath, inFile io.Reader, inFileSize int64, us
 		return err
 	}
 
-	outFilepath.WriteLock()
-	defer outFilepath.WriteUnlock()
+	lock := outFilepath.WriteLock()
+	defer outFilepath.WriteUnlock(lock)
 
 	outFile, err := os.Create(string(outFilepath))
 	if err != nil {
