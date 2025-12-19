@@ -33,6 +33,12 @@ func (filepath FsFilepath) WriteUnlock() {
 	}
 }
 
+var cipherReadBufferPool = sync.Pool{
+	New: func() any {
+		return make(Ciphertext, BLOCK_SIZE_ENCRYPTED)
+	},
+}
+
 type BlockCache struct {
 	sync.Mutex
 
@@ -121,7 +127,8 @@ func (f *CryFileReader) Read(p []byte) (int, error) {
 			return 0, err
 		}
 
-		buf := make(Ciphertext, BLOCK_SIZE_ENCRYPTED)
+		buf := cipherReadBufferPool.Get().(Ciphertext)
+		defer cipherReadBufferPool.Put(buf)
 		n, err := f.file.Read(buf)
 		if err != nil {
 			return 0, err
