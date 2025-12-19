@@ -26,6 +26,7 @@ func TestNoAuth(t *testing.T) {
 func TestClosedRegistrationUserNotAllowed(t *testing.T) {
 
 	t.Setenv("SECRET_KEY", "q38rcNPrHkxBonj16HTKG95zbq0bzmJ189C9A-EgTxg")
+	t.Setenv("OPEN_REGISTRATION", "false")
 
 	app := makeAppData()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
